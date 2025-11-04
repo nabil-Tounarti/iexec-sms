@@ -16,7 +16,6 @@
 
 package com.iexec.sms.secret;
 
-import com.iexec.sms.authorization.AuthorizationService;
 import com.iexec.sms.secret.web2.NotAnExistingSecretException;
 import com.iexec.sms.secret.web2.SameSecretException;
 import com.iexec.sms.secret.web2.Web2SecretService;
@@ -34,15 +33,12 @@ import java.util.NoSuchElementException;
 @RequestMapping("/secrets")
 public class SecretController {
 
-    private final AuthorizationService authorizationService;
     private final Web3SecretService web3SecretService;
     private final Web2SecretService web2SecretService;
 
-    public SecretController(AuthorizationService authorizationService,
-                            Web2SecretService web2SecretService,
+    public SecretController(Web2SecretService web2SecretService,
                             Web3SecretService web3SecretService) {
         this.web2SecretService = web2SecretService;
-        this.authorizationService = authorizationService;
         this.web3SecretService = web3SecretService;
     }
 
@@ -59,12 +55,6 @@ public class SecretController {
     public ResponseEntity<String> addWeb3Secret(@RequestHeader String authorization,
                                                 @RequestParam String secretAddress,
                                                 @RequestBody String secretValue) {
-        String challenge = authorizationService.getChallengeForSetWeb3Secret(secretAddress, secretValue);
-
-        if (!authorizationService.isSignedByOwner(challenge, authorization, secretAddress)) {
-            log.error("Unauthorized to addWeb3Secret [expectedChallenge:{}]", challenge);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
 
         if (!SecretUtils.isSecretSizeValid(secretValue)) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
@@ -92,12 +82,6 @@ public class SecretController {
                                                 @RequestParam String ownerAddress,
                                                 @RequestParam String secretName,
                                                 @RequestBody String secretValue) {
-        String challenge = authorizationService.getChallengeForSetWeb2Secret(ownerAddress, secretName, secretValue);
-
-        if (!authorizationService.isSignedByHimself(challenge, authorization, ownerAddress)) {
-            log.error("Unauthorized to addWeb2Secret [expectedChallenge:{}]", challenge);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
 
         if (!SecretUtils.isSecretSizeValid(secretValue)) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
@@ -115,12 +99,6 @@ public class SecretController {
                                                    @RequestParam String ownerAddress,
                                                    @RequestParam String secretName,
                                                    @RequestBody String newSecretValue) {
-        String challenge = authorizationService.getChallengeForSetWeb2Secret(ownerAddress, secretName, newSecretValue);
-
-        if (!authorizationService.isSignedByHimself(challenge, authorization, ownerAddress)) {
-            log.error("Unauthorized to updateWeb2Secret [expectedChallenge:{}]", challenge);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
 
         if (!SecretUtils.isSecretSizeValid(newSecretValue)) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();

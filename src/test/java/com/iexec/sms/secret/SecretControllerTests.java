@@ -16,7 +16,6 @@
 
 package com.iexec.sms.secret;
 
-import com.iexec.sms.authorization.AuthorizationService;
 import com.iexec.sms.secret.web2.NotAnExistingSecretException;
 import com.iexec.sms.secret.web2.SameSecretException;
 import com.iexec.sms.secret.web2.Web2SecretService;
@@ -46,9 +45,6 @@ class SecretControllerTests {
     private static final String WEB3_SECRET_VALUE = "WEB3_SECRET_VALUE";
 
     @Mock
-    private AuthorizationService authorizationService;
-
-    @Mock
     private Web2SecretService web2SecretService;
 
     @Mock
@@ -71,7 +67,6 @@ class SecretControllerTests {
                 .thenReturn(true);
         assertThat(secretController.isWeb3SecretSet(WEB3_SECRET_ADDRESS))
                 .isEqualTo(ResponseEntity.noContent().build());
-        verifyNoInteractions(authorizationService, web2SecretService);
     }
 
     @Test
@@ -80,29 +75,13 @@ class SecretControllerTests {
                 .thenReturn(false);
         assertThat(secretController.isWeb3SecretSet(WEB3_SECRET_ADDRESS))
                 .isEqualTo(ResponseEntity.notFound().build());
-        verifyNoInteractions(authorizationService, web2SecretService);
     }
     //endregion
 
     //region addWeb3Secret
     @Test
-    void failToAddWeb3SecretWhenBadAuthorization() {
-        when(authorizationService.getChallengeForSetWeb3Secret(WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByOwner(CHALLENGE, AUTHORIZATION, WEB3_SECRET_ADDRESS))
-                .thenReturn(false);
-        assertThat(secretController.addWeb3Secret(AUTHORIZATION, WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
-                .isEqualTo(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
-        verifyNoInteractions(web2SecretService, web3SecretService);
-    }
-
-    @Test
     void failToAddWeb3SecretWhenPayloadTooLarge() {
         final String payloadTooLarge = getRandomString(4097);
-        when(authorizationService.getChallengeForSetWeb3Secret(WEB3_SECRET_ADDRESS, payloadTooLarge))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByOwner(CHALLENGE, AUTHORIZATION, WEB3_SECRET_ADDRESS))
-                .thenReturn(true);
         assertThat(secretController.addWeb3Secret(AUTHORIZATION, WEB3_SECRET_ADDRESS, payloadTooLarge))
                 .isEqualTo(ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build());
         verifyNoInteractions(web2SecretService, web3SecretService);
@@ -110,10 +89,6 @@ class SecretControllerTests {
 
     @Test
     void failToAddWeb3SecretWhenSecretAlreadyExists() {
-        when(authorizationService.getChallengeForSetWeb3Secret(WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByOwner(CHALLENGE, AUTHORIZATION, WEB3_SECRET_ADDRESS))
-                .thenReturn(true);
         when(web3SecretService.addSecret(WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
                 .thenReturn(false);
         assertThat(secretController.addWeb3Secret(AUTHORIZATION, WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
@@ -124,10 +99,6 @@ class SecretControllerTests {
 
     @Test
     void addWeb3Secret() {
-        when(authorizationService.getChallengeForSetWeb3Secret(WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByOwner(CHALLENGE, AUTHORIZATION, WEB3_SECRET_ADDRESS))
-                .thenReturn(true);
         when(web3SecretService.addSecret(WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
                 .thenReturn(true);
         assertThat(secretController.addWeb3Secret(AUTHORIZATION, WEB3_SECRET_ADDRESS, WEB3_SECRET_VALUE))
@@ -144,7 +115,6 @@ class SecretControllerTests {
                 .thenReturn(true);
         assertThat(secretController.isWeb2SecretSet(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME))
                 .isEqualTo(ResponseEntity.noContent().build());
-        verifyNoInteractions(authorizationService, web3SecretService);
     }
 
     @Test
@@ -153,29 +123,14 @@ class SecretControllerTests {
                 .thenReturn(false);
         assertThat(secretController.isWeb2SecretSet(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME))
                 .isEqualTo(ResponseEntity.notFound().build());
-        verifyNoInteractions(authorizationService, web3SecretService);
     }
     //endregion
 
     //region addWeb2Secret
-    @Test
-    void failToAddWeb2SecretWhenBadAuthorization() {
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(false);
-        assertThat(secretController.addWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .isEqualTo(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
-        verifyNoInteractions(web2SecretService, web3SecretService);
-    }
 
     @Test
     void failToAddWeb2SecretWhenPayloadTooLarge() {
         final String payloadTooLarge = getRandomString(4097);
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, payloadTooLarge))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(true);
         assertThat(secretController.addWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, payloadTooLarge))
                 .isEqualTo(ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build());
         verifyNoInteractions(web2SecretService, web3SecretService);
@@ -183,10 +138,6 @@ class SecretControllerTests {
 
     @Test
     void failToAddWeb2SecretWhenSecretAlreadyExists() {
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(true);
         when(web2SecretService.addSecret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
                 .thenReturn(false);
         assertThat(secretController.addWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
@@ -196,10 +147,6 @@ class SecretControllerTests {
 
     @Test
     void addWeb2Secret() {
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(true);
         when(web2SecretService.addSecret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
                 .thenReturn(true);
         assertThat(secretController.addWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
@@ -210,23 +157,8 @@ class SecretControllerTests {
 
     //region updateWeb2Secret
     @Test
-    void failToUpdateWeb2SecretWhenBadAuthorization() {
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(false);
-        assertThat(secretController.updateWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .isEqualTo(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
-        verifyNoInteractions(web2SecretService, web3SecretService);
-    }
-
-    @Test
     void failToUpdateWeb2SecretWhenPayloadTooLarge() {
         final String payloadTooLarge = getRandomString(4097);
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, payloadTooLarge))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(true);
         assertThat(secretController.updateWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, payloadTooLarge))
                 .isEqualTo(ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build());
         verifyNoInteractions(web2SecretService, web3SecretService);
@@ -234,10 +166,6 @@ class SecretControllerTests {
 
     @Test
     void failToUpdateWeb2SecretWhenSecretIsMissing() throws NotAnExistingSecretException, SameSecretException {
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(true);
         doThrow(NotAnExistingSecretException.class).when(web2SecretService)
                 .updateSecret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE);
         assertThat(secretController.updateWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
@@ -246,10 +174,6 @@ class SecretControllerTests {
 
     @Test
     void updateWeb2Secret() {
-        when(authorizationService.getChallengeForSetWeb2Secret(WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
-                .thenReturn(CHALLENGE);
-        when(authorizationService.isSignedByHimself(CHALLENGE, AUTHORIZATION, WEB2_OWNER_ADDRESS))
-                .thenReturn(true);
         assertThat(secretController.updateWeb2Secret(AUTHORIZATION, WEB2_OWNER_ADDRESS, WEB2_SECRET_NAME, WEB2_SECRET_VALUE))
                 .isEqualTo(ResponseEntity.noContent().build());
     }
