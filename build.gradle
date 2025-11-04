@@ -48,7 +48,6 @@ dependencies {
     // iexec
     implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
     implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
-    implementation project(':iexec-sms-library')
 
     // spring
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -106,7 +105,6 @@ testing {
             }
             dependencies {
                 implementation project()
-                implementation project(':iexec-sms-library')
                 implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
                 implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
                 implementation 'org.apache.commons:commons-lang3'

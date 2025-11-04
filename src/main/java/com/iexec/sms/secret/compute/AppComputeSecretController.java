@@ -17,8 +17,6 @@
 package com.iexec.sms.secret.compute;
 
 import com.iexec.common.web.ApiResponseBody;
-import com.iexec.sms.api.SmsClient;
-import com.iexec.sms.authorization.AuthorizationService;
 import com.iexec.sms.secret.SecretUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -35,7 +33,6 @@ import java.util.regex.Pattern;
 @RestController
 public class AppComputeSecretController {
 
-    private final AuthorizationService authorizationService;
     private final TeeTaskComputeSecretService teeTaskComputeSecretService;
 
     private static final ApiResponseBody<String, List<String>> invalidAuthorizationPayload = createErrorPayload("Invalid authorization");
@@ -46,9 +43,7 @@ public class AppComputeSecretController {
             + TeeTaskComputeSecretHeader.SECRET_KEY_MIN_LENGTH + ","
             + TeeTaskComputeSecretHeader.SECRET_KEY_MAX_LENGTH + "}$");
 
-    public AppComputeSecretController(AuthorizationService authorizationService,
-                                      TeeTaskComputeSecretService teeTaskComputeSecretService) {
-        this.authorizationService = authorizationService;
+    public AppComputeSecretController(TeeTaskComputeSecretService teeTaskComputeSecretService) {
         this.teeTaskComputeSecretService = teeTaskComputeSecretService;
     }
 
@@ -59,15 +54,6 @@ public class AppComputeSecretController {
                                                                                                          @PathVariable String appAddress,
                                                                                                          @RequestBody String secretValue) {
         appAddress = appAddress.toLowerCase();
-        String challenge = authorizationService.getChallengeForSetAppDeveloperAppComputeSecret(appAddress, SmsClient.APP_DEVELOPER_SECRET_INDEX, secretValue);
-
-        if (!authorizationService.isSignedByOwner(challenge, authorization, appAddress)) {
-            log.error("Unauthorized to addAppDeveloperComputeComputeSecret [appAddress: {}, expectedChallenge: {}]",
-                    appAddress, challenge);
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body(invalidAuthorizationPayload);
-        }
 
         if (!SecretUtils.isSecretSizeValid(secretValue)) {
             return ResponseEntity
@@ -80,7 +66,7 @@ public class AppComputeSecretController {
                 appAddress,
                 SecretOwnerRole.APPLICATION_DEVELOPER,
                 "",
-                SmsClient.APP_DEVELOPER_SECRET_INDEX,
+                "1",
                 secretValue
         )) {
             log.error("Can't add app developer secret as it already exists [appAddress:{}]",
@@ -101,7 +87,7 @@ public class AppComputeSecretController {
                 appAddress,
                 SecretOwnerRole.APPLICATION_DEVELOPER,
                 "",
-                SmsClient.APP_DEVELOPER_SECRET_INDEX
+                "1"
         );
         if (isSecretPresent) {
             log.debug("App developer secret found [appAddress: {}]", appAddress);
@@ -122,20 +108,6 @@ public class AppComputeSecretController {
                                                                                               @PathVariable String secretKey,
                                                                                               @RequestBody String secretValue) {
         requesterAddress = requesterAddress.toLowerCase();
-
-        String challenge = authorizationService.getChallengeForSetRequesterAppComputeSecret(
-                requesterAddress,
-                secretKey,
-                secretValue
-        );
-
-        if (!authorizationService.isSignedByHimself(challenge, authorization, requesterAddress)) {
-            log.error("Unauthorized to addRequesterAppComputeSecret [requesterAddress:{}, expectedChallenge:{}]",
-                    requesterAddress, challenge);
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body(invalidAuthorizationPayload);
-        }
 
         if (!secretKeyPattern.matcher(secretKey).matches()) {
             return ResponseEntity
