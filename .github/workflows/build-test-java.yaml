@@ -84,8 +84,7 @@ jobs:
             echo "✅ Nexus dependencies cache restored"
             echo "nexus_cache_available=true" >> $GITHUB_OUTPUT
           else
-            echo "ℹ️  No pre-populated cache found"
-            echo "💡 build.gradle will use JitPack to download from GitHub releases automatically"
+            echo "⚠️  No pre-populated cache found - build will fail without VPN access"
             echo "nexus_cache_available=false" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true
@@ -96,10 +95,10 @@ jobs:
           if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
             echo "✅ Using cached Nexus dependencies"
           else
-            echo "✅ Using JitPack to download from GitHub releases (automatic)"
+            echo "⚠️  No cache available - build will fail (upload cache archive to release)"
           fi
           echo "✅ Plugins downloaded online from public repositories"
-          # Build normally - Gradle will use cached deps OR JitPack (GitHub releases) automatically
+          # Build normally - Gradle will use cached Nexus dependencies
           ./gradlew build -x test
 
       - name: Run tests
