@@ -43,6 +43,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Download pre-populated Gradle dependencies cache
+        id: gradle-cache
         run: |
           mkdir -p ~/.gradle/caches
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/deps-cache"
@@ -80,22 +81,45 @@ jobs:
             done
 
             echo "✅ Dependencies cache restored (JARs + metadata)"
+            echo "cache_available=true" >> $GITHUB_OUTPUT
           else
             echo "ℹ️  No pre-populated cache found, Gradle will download dependencies"
+            echo "cache_available=false" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true
 
       - name: Build
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: ./gradlew build -x test
+        run: |
+          if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
+            echo "🔒 Building in offline mode (using cached dependencies)"
+            ./gradlew build -x test --offline
+          else
+            echo "🌐 Building with network access"
+            ./gradlew build -x test
+          fi
 
       - name: Run tests
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: ./gradlew test
+        run: |
+          if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
+            echo "🔒 Running tests in offline mode (using cached dependencies)"
+            ./gradlew test --offline
+          else
+            echo "🌐 Running tests with network access"
+            ./gradlew test
+          fi
 
       - name: Generate coverage report
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: ./gradlew jacocoTestReport
+        run: |
+          if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
+            echo "🔒 Generating coverage report in offline mode"
+            ./gradlew jacocoTestReport --offline
+          else
+            echo "🌐 Generating coverage report with network access"
+            ./gradlew jacocoTestReport
+          fi
 
       - name: Publish Test Results
         if: always()

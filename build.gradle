@@ -20,11 +20,17 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
-        maven {
-            url 'https://docker-regis-adm.iex.ec/repository/maven-public/'
-            credentials {
-                username nexusUser
-                password nexusPassword
+        // Nexus repository (only used locally with VPN and credentials)
+        def nexusUser = project.findProperty("nexusUser") ?: System.getenv("NEXUS_USER") ?: ""
+        def nexusPassword = project.findProperty("nexusPassword") ?: System.getenv("NEXUS_PASSWORD") ?: ""
+        if (nexusUser && nexusPassword) {
+            maven {
+                name = "Nexus"
+                url 'https://docker-regis-adm.iex.ec/repository/maven-public/'
+                credentials {
+                    username = nexusUser
+                    password = nexusPassword
+                }
             }
         }
         maven {
