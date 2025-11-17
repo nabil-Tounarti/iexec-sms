@@ -44,7 +44,7 @@ jobs:
 
       - name: Download pre-populated Gradle dependencies cache
         run: |
-          mkdir -p ~/.gradle/caches/modules-2/files-2.1
+          mkdir -p ~/.gradle/caches
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/deps-cache"
 
           # Download checksums file to get list of available dependencies
@@ -71,15 +71,15 @@ jobs:
             # Verify checksums
             cd /tmp && sha256sum -c gradle-deps-checksums.sha256 && cd -
 
-            # Extract each dependency archive
+            # Extract each dependency archive (contains both files-2.1 and metadata-2.*)
             for ARCHIVE in /tmp/gradle-deps-*.tar.gz; do
               if [ -f "$ARCHIVE" ]; then
                 echo "Extracting: $(basename $ARCHIVE)"
-                tar -xzf "$ARCHIVE" -C ~/.gradle/caches/modules-2/files-2.1
+                tar -xzf "$ARCHIVE" -C ~/.gradle/caches
               fi
             done
 
-            echo "✅ Dependencies cache restored"
+            echo "✅ Dependencies cache restored (JARs + metadata)"
           else
             echo "ℹ️  No pre-populated cache found, Gradle will download dependencies"
           fi
