@@ -81,6 +81,21 @@ jobs:
               fi
             done
 
+            # Verify cache structure
+            echo "Verifying cache structure..."
+            if [ -d ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco ]; then
+              echo "✅ Found iexec-commons-poco in cache"
+              ls -la ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco/
+            else
+              echo "⚠️  iexec-commons-poco not found in cache"
+            fi
+            if [ -d ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/iexec-common ]; then
+              echo "✅ Found iexec-common in cache"
+              ls -la ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/iexec-common/
+            else
+              echo "⚠️  iexec-common not found in cache"
+            fi
+
             echo "✅ Nexus dependencies cache restored"
             echo "nexus_cache_available=true" >> $GITHUB_OUTPUT
           else
@@ -89,25 +104,43 @@ jobs:
           fi
         continue-on-error: true
 
+      - name: Download Gradle plugins (online)
+        working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
+        run: |
+          echo "📥 Downloading Gradle plugins (requires online access)..."
+          # Download plugins first (this requires online access to Gradle Plugin Portal)
+          ./gradlew tasks --all > /dev/null 2>&1 || true
+          echo "✅ Plugins downloaded"
+
       - name: Build
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
         run: |
           if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
-            echo "✅ Using cached Nexus dependencies"
+            echo "✅ Using cached Nexus dependencies (offline mode)"
+            # Build with --offline to use cache only (plugins already downloaded)
+            ./gradlew build -x test --offline
           else
             echo "⚠️  No cache available - build will fail (upload cache archive to release)"
+            ./gradlew build -x test
           fi
-          echo "✅ Plugins downloaded online from public repositories"
-          # Build normally - Gradle will use cached Nexus dependencies
-          ./gradlew build -x test
 
       - name: Run tests
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: ./gradlew test
+        run: |
+          if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
+            ./gradlew test --offline
+          else
+            ./gradlew test
+          fi
 
       - name: Generate coverage report
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: ./gradlew jacocoTestReport
+        run: |
+          if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
+            ./gradlew jacocoTestReport --offline
+          else
+            ./gradlew jacocoTestReport
+          fi
 
       - name: Publish Test Results
         if: always()

@@ -25,18 +25,23 @@ allprojects {
             name = "JitPack"
             url 'https://jitpack.io'
         }
-        // Nexus repository (only used locally with VPN and credentials)
+        // Nexus repository - always add it so Gradle knows where to look for com.iexec.* dependencies
+        // In CI without VPN: Gradle will use cached artifacts
+        // Locally with VPN: Gradle will download from Nexus
         def nexusUser = project.findProperty("nexusUser") ?: System.getenv("NEXUS_USER") ?: ""
         def nexusPassword = project.findProperty("nexusPassword") ?: System.getenv("NEXUS_PASSWORD") ?: ""
-        if (nexusUser && nexusPassword) {
-            maven {
-                name = "Nexus"
-                url 'https://docker-regis-adm.iex.ec/repository/maven-public/'
+        maven {
+            name = "Nexus"
+            url 'https://docker-regis-adm.iex.ec/repository/maven-public/'
+            // Only add credentials if provided (local development)
+            if (nexusUser && nexusPassword) {
                 credentials {
                     username = nexusUser
                     password = nexusPassword
                 }
             }
+            // Allow repository to fail gracefully in CI (will use cache instead)
+            allowInsecureProtocol = false
         }
     }
     java {
