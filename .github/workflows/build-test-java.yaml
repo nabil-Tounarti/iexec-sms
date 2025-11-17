@@ -76,18 +76,26 @@ jobs:
             for ARCHIVE in /tmp/gradle-deps-*.tar.gz; do
               if [ -f "$ARCHIVE" ]; then
                 echo "Extracting: $(basename $ARCHIVE)"
+                # Debug: show archive contents
+                echo "Archive contents:"
+                tar -tzf "$ARCHIVE" | head -10
                 # Archives contain modules-2 structure, extract to caches root
                 tar -xzf "$ARCHIVE" -C ~/.gradle/caches
+                echo "Extracted to: ~/.gradle/caches"
               fi
             done
 
             # Verify cache structure
             echo "Verifying cache structure..."
+            echo "Checking: ~/.gradle/caches/modules-2/files-2.1/"
+            ls -la ~/.gradle/caches/modules-2/files-2.1/ 2>/dev/null | head -20 || echo "Directory doesn't exist"
             if [ -d ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco ]; then
               echo "✅ Found iexec-commons-poco in cache"
               ls -la ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco/
             else
               echo "⚠️  iexec-commons-poco not found in cache"
+              echo "Looking for any com.iexec.* directories:"
+              find ~/.gradle/caches/modules-2/files-2.1 -type d -name "com.iexec.*" 2>/dev/null | head -10 || echo "None found"
             fi
             if [ -d ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/iexec-common ]; then
               echo "✅ Found iexec-common in cache"
@@ -109,26 +117,15 @@ jobs:
         run: |
           if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
             echo "📥 Downloading Gradle plugins and public dependencies (requires online access)..."
-            echo "🔧 Temporarily disabling Nexus repository to force cache usage..."
-            # Backup build.gradle
-            cp build.gradle build.gradle.bak
-            # Comment out the entire Nexus maven block (from "maven {" to closing "}")
-            sed -i '/maven {/,/^        }$/ {
-              /maven {/ s/^/\/\/ /
-              /name = "Nexus"/ s/^/\/\/ /
-              /url / s/^/\/\/ /
-              /if (nexusUser/ s/^/\/\/ /
-              /credentials {/ s/^/\/\/ /
-              /username = nexusUser/ s/^/\/\/ /
-              /password = nexusPassword/ s/^/\/\/ /
-              /}/ s/^/\/\/ /
-              /allowInsecureProtocol/ s/^/\/\/ /
-            }' build.gradle
+            echo "🔧 Creating Gradle init script to disable Nexus repository..."
+            # Create init script that removes Nexus repository
+            mkdir -p ~/.gradle/init.d
+            echo 'allprojects { repositories.removeAll { it.name == "Nexus" } }' > ~/.gradle/init.d/disable-nexus.gradle
             echo "Resolving dependencies (Nexus deps from cache, public deps from Maven Central)..."
             # Now Gradle will use cached Nexus deps and download public deps
             ./gradlew dependencies --configuration compileClasspath 2>&1 | tail -30 || true
-            # Restore build.gradle
-            mv build.gradle.bak build.gradle
+            # Cleanup init script
+            rm -f ~/.gradle/init.d/disable-nexus.gradle
             echo "✅ Dependencies resolved (Nexus from cache, public from Maven Central)"
           else
             echo "📥 Downloading Gradle plugins and public dependencies..."
