@@ -92,34 +92,17 @@ jobs:
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
         run: |
           if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
-            echo "🔒 Building in offline mode (using cached dependencies)"
-            ./gradlew build -x test --offline
-          else
-            echo "🌐 Building with network access"
-            ./gradlew build -x test
+            echo "✅ Using cached dependencies (Nexus repository disabled in CI)"
           fi
+          ./gradlew build -x test
 
       - name: Run tests
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: |
-          if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
-            echo "🔒 Running tests in offline mode (using cached dependencies)"
-            ./gradlew test --offline
-          else
-            echo "🌐 Running tests with network access"
-            ./gradlew test
-          fi
+        run: ./gradlew test
 
       - name: Generate coverage report
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
-        run: |
-          if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
-            echo "🔒 Generating coverage report in offline mode"
-            ./gradlew jacocoTestReport --offline
-          else
-            echo "🌐 Generating coverage report with network access"
-            ./gradlew jacocoTestReport
-          fi
+        run: ./gradlew jacocoTestReport
 
       - name: Publish Test Results
         if: always()
