@@ -134,8 +134,13 @@ jobs:
             echo 'allprojects { repositories.removeAll { it.name == "Nexus" } }' > ~/.gradle/init.d/disable-nexus.gradle
             echo "Resolving dependencies (Nexus deps from cache, public deps from Maven Central)..."
             # Now Gradle will use cached Nexus deps and download public deps
-            # Use compileJava task to actually download dependencies, not just resolve them
-            ./gradlew compileJava --dry-run 2>&1 | tail -30 || true
+            # Run tasks that require dependencies to be downloaded
+            # generateEffectiveLombokConfig requires Lombok, compileJava requires all compile deps
+            echo "Downloading Lombok and other dependencies..."
+            ./gradlew generateEffectiveLombokConfig 2>&1 | tail -50 || true
+            echo "Downloading compile-time dependencies..."
+            ./gradlew compileJava 2>&1 | tail -50 || true
+            echo "Dependencies download completed"
             # Cleanup init script
             rm -f ~/.gradle/init.d/disable-nexus.gradle
             echo "✅ Dependencies resolved (Nexus from cache, public from Maven Central)"
