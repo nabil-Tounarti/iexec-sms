@@ -11,6 +11,10 @@ on:
         description: "The directory to run jobs from"
         default: "."
         type: string
+      runner:
+        description: "Runner type (ubuntu-latest or self-hosted)"
+        default: "ubuntu-latest"
+        type: string
   pull_request:
     branches:
       - main
@@ -20,7 +24,7 @@ on:
 
 jobs:
   build_and_test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner != '' && inputs.runner || 'ubuntu-latest' }}
     permissions:
       contents: read
       checks: write
@@ -37,6 +41,49 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Download pre-populated Gradle dependencies cache
+        run: |
+          mkdir -p ~/.gradle/caches/modules-2/files-2.1
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/deps-cache"
+
+          # Download checksums file to get list of available dependencies
+          if curl -fL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o /tmp/gradle-deps-checksums.sha256 "${BASE_URL}/gradle-deps-checksums.sha256" 2>/dev/null; then
+            echo "✅ Downloading dependency archives..."
+
+            # Extract archive names from checksums file
+            DEPENDENCY_COUNT=0
+            while IFS= read -r line; do
+              ARCHIVE_NAME=$(echo "$line" | awk '{print $2}')
+              if [ -n "$ARCHIVE_NAME" ]; then
+                ARCHIVE_URL="${BASE_URL}/${ARCHIVE_NAME}"
+                echo "Downloading: $ARCHIVE_NAME"
+                if curl -fL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o "/tmp/${ARCHIVE_NAME}" "$ARCHIVE_URL" 2>/dev/null; then
+                  DEPENDENCY_COUNT=$((DEPENDENCY_COUNT + 1))
+                else
+                  echo "⚠️  Failed to download: $ARCHIVE_NAME"
+                fi
+              fi
+            done < /tmp/gradle-deps-checksums.sha256
+
+            echo "Downloaded $DEPENDENCY_COUNT dependency archives"
+
+            # Verify checksums
+            cd /tmp && sha256sum -c gradle-deps-checksums.sha256 && cd -
+
+            # Extract each dependency archive
+            for ARCHIVE in /tmp/gradle-deps-*.tar.gz; do
+              if [ -f "$ARCHIVE" ]; then
+                echo "Extracting: $(basename $ARCHIVE)"
+                tar -xzf "$ARCHIVE" -C ~/.gradle/caches/modules-2/files-2.1
+              fi
+            done
+
+            echo "✅ Dependencies cache restored"
+          else
+            echo "ℹ️  No pre-populated cache found, Gradle will download dependencies"
+          fi
+        continue-on-error: true
 
       - name: Build
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}

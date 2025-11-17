@@ -31,3 +31,4 @@ build
 ### iExec ###
 
 src/test/resources/iexec-sms-aes.key
+/scripts/
