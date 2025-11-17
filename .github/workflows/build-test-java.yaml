@@ -89,17 +89,28 @@ jobs:
             echo "Verifying cache structure..."
             echo "Checking: ~/.gradle/caches/modules-2/files-2.1/"
             ls -la ~/.gradle/caches/modules-2/files-2.1/ 2>/dev/null | head -20 || echo "Directory doesn't exist"
+            # Check for correct structure (with group directory)
             if [ -d ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco ]; then
-              echo "✅ Found iexec-commons-poco in cache"
+              echo "✅ Found iexec-commons-poco in cache (correct structure)"
               ls -la ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco/
+            elif [ -d ~/.gradle/caches/modules-2/files-2.1/iexec-commons-poco ]; then
+              echo "⚠️  Found iexec-commons-poco but missing group directory - fixing..."
+              # Fix structure: move to correct location
+              mkdir -p ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons
+              mv ~/.gradle/caches/modules-2/files-2.1/iexec-commons-poco ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/
+              echo "✅ Fixed structure"
             else
               echo "⚠️  iexec-commons-poco not found in cache"
-              echo "Looking for any com.iexec.* directories:"
-              find ~/.gradle/caches/modules-2/files-2.1 -type d -name "com.iexec.*" 2>/dev/null | head -10 || echo "None found"
+              find ~/.gradle/caches/modules-2/files-2.1 -type d -name "*iexec*" 2>/dev/null | head -10 || echo "None found"
             fi
             if [ -d ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/iexec-common ]; then
-              echo "✅ Found iexec-common in cache"
+              echo "✅ Found iexec-common in cache (correct structure)"
               ls -la ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/iexec-common/
+            elif [ -d ~/.gradle/caches/modules-2/files-2.1/iexec-common ]; then
+              echo "⚠️  Found iexec-common but missing group directory - fixing..."
+              mkdir -p ~/.gradle/caches/modules-2/files-2.1/com.iexec.common
+              mv ~/.gradle/caches/modules-2/files-2.1/iexec-common ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/
+              echo "✅ Fixed structure"
             else
               echo "⚠️  iexec-common not found in cache"
             fi
@@ -123,7 +134,8 @@ jobs:
             echo 'allprojects { repositories.removeAll { it.name == "Nexus" } }' > ~/.gradle/init.d/disable-nexus.gradle
             echo "Resolving dependencies (Nexus deps from cache, public deps from Maven Central)..."
             # Now Gradle will use cached Nexus deps and download public deps
-            ./gradlew dependencies --configuration compileClasspath 2>&1 | tail -30 || true
+            # Use compileJava task to actually download dependencies, not just resolve them
+            ./gradlew compileJava --dry-run 2>&1 | tail -30 || true
             # Cleanup init script
             rm -f ~/.gradle/init.d/disable-nexus.gradle
             echo "✅ Dependencies resolved (Nexus from cache, public from Maven Central)"
