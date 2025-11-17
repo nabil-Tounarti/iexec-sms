@@ -107,14 +107,34 @@ jobs:
       - name: Download Gradle plugins and public dependencies (online)
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
         run: |
-          echo "📥 Downloading Gradle plugins and public dependencies (requires online access)..."
-          # Trigger dependency resolution - this will download Lombok, Spring Boot, etc. from Maven Central
-          # Nexus dependencies will fail (403), but Gradle caches dependencies as it resolves them
-          # Nexus dependencies are already in cache from the extracted archive
-          echo "Resolving dependencies (will fail on Nexus, but public deps will be cached)..."
-          # Run a task that requires dependency resolution - allow it to fail on Nexus deps
-          ./gradlew compileJava 2>&1 | grep -E "(Downloaded|Resolved|FAILED|BUILD)" | head -20 || true
-          echo "✅ Public dependencies should be cached now"
+          if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
+            echo "📥 Downloading Gradle plugins and public dependencies (requires online access)..."
+            echo "🔧 Temporarily disabling Nexus repository to force cache usage..."
+            # Backup build.gradle
+            cp build.gradle build.gradle.bak
+            # Comment out the entire Nexus maven block (from "maven {" to closing "}")
+            sed -i '/maven {/,/^        }$/ {
+              /maven {/ s/^/\/\/ /
+              /name = "Nexus"/ s/^/\/\/ /
+              /url / s/^/\/\/ /
+              /if (nexusUser/ s/^/\/\/ /
+              /credentials {/ s/^/\/\/ /
+              /username = nexusUser/ s/^/\/\/ /
+              /password = nexusPassword/ s/^/\/\/ /
+              /}/ s/^/\/\/ /
+              /allowInsecureProtocol/ s/^/\/\/ /
+            }' build.gradle
+            echo "Resolving dependencies (Nexus deps from cache, public deps from Maven Central)..."
+            # Now Gradle will use cached Nexus deps and download public deps
+            ./gradlew dependencies --configuration compileClasspath 2>&1 | tail -30 || true
+            # Restore build.gradle
+            mv build.gradle.bak build.gradle
+            echo "✅ Dependencies resolved (Nexus from cache, public from Maven Central)"
+          else
+            echo "📥 Downloading Gradle plugins and public dependencies..."
+            ./gradlew dependencies --configuration compileClasspath 2>&1 | tail -30 || true
+            echo "✅ Public dependencies cached"
+          fi
 
       - name: Build
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
