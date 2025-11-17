@@ -42,15 +42,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Download pre-populated Gradle dependencies cache
-        id: gradle-cache
+      - name: Download pre-populated Nexus dependencies cache
+        id: nexus-cache
         run: |
-          mkdir -p ~/.gradle/caches
+          mkdir -p ~/.gradle/caches/modules-2/files-2.1
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/deps-cache"
 
           # Download checksums file to get list of available dependencies
           if curl -fL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o /tmp/gradle-deps-checksums.sha256 "${BASE_URL}/gradle-deps-checksums.sha256" 2>/dev/null; then
-            echo "✅ Downloading dependency archives..."
+            echo "✅ Downloading Nexus dependency archives..."
 
             # Extract archive names from checksums file
             DEPENDENCY_COUNT=0
@@ -72,28 +72,34 @@ jobs:
             # Verify checksums
             cd /tmp && sha256sum -c gradle-deps-checksums.sha256 && cd -
 
-            # Extract each dependency archive (contains both files-2.1 and metadata-2.*)
+            # Extract each dependency archive (contains modules-2 structure with files-2.1 and metadata)
             for ARCHIVE in /tmp/gradle-deps-*.tar.gz; do
               if [ -f "$ARCHIVE" ]; then
                 echo "Extracting: $(basename $ARCHIVE)"
+                # Archives contain modules-2 structure, extract to caches root
                 tar -xzf "$ARCHIVE" -C ~/.gradle/caches
               fi
             done
 
-            echo "✅ Dependencies cache restored (JARs + metadata)"
-            echo "cache_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Nexus dependencies cache restored"
+            echo "nexus_cache_available=true" >> $GITHUB_OUTPUT
           else
-            echo "ℹ️  No pre-populated cache found, Gradle will download dependencies"
-            echo "cache_available=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  No pre-populated cache found"
+            echo "💡 build.gradle will use JitPack to download from GitHub releases automatically"
+            echo "nexus_cache_available=false" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true
 
       - name: Build
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
         run: |
-          if [ "${{ steps.gradle-cache.outputs.cache_available }}" == "true" ]; then
-            echo "✅ Using cached dependencies (Nexus repository disabled in CI)"
+          if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
+            echo "✅ Using cached Nexus dependencies"
+          else
+            echo "✅ Using JitPack to download from GitHub releases (automatic)"
           fi
+          echo "✅ Plugins downloaded online from public repositories"
+          # Build normally - Gradle will use cached deps OR JitPack (GitHub releases) automatically
           ./gradlew build -x test
 
       - name: Run tests

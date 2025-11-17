@@ -20,6 +20,11 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
+        // JitPack - builds from GitHub releases (no VPN needed, works in CI)
+        maven {
+            name = "JitPack"
+            url 'https://jitpack.io'
+        }
         // Nexus repository (only used locally with VPN and credentials)
         def nexusUser = project.findProperty("nexusUser") ?: System.getenv("NEXUS_USER") ?: ""
         def nexusPassword = project.findProperty("nexusPassword") ?: System.getenv("NEXUS_PASSWORD") ?: ""
@@ -32,9 +37,6 @@ allprojects {
                     password = nexusPassword
                 }
             }
-        }
-        maven {
-            url 'https://jitpack.io'
         }
     }
     java {
@@ -52,8 +54,18 @@ allprojects {
 
 dependencies {
     // iexec
-    implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
-    implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
+    def nexusUser = project.findProperty("nexusUser") ?: System.getenv("NEXUS_USER") ?: ""
+    def nexusPassword = project.findProperty("nexusPassword") ?: System.getenv("NEXUS_PASSWORD") ?: ""
+
+    if (nexusUser && nexusPassword) {
+        // Use Nexus versions (local development with VPN)
+        implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
+        implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
+    } else {
+        // Use JitPack versions (CI - builds from GitHub releases)
+        implementation "com.github.iExecBlockchainComputing:iexec-commons-poco:$iexecCommonsPocoVersion"
+        implementation "com.github.iExecBlockchainComputing:iexec-common:$iexecCommonVersion"
+    }
 
     // spring
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -111,8 +123,16 @@ testing {
             }
             dependencies {
                 implementation project()
-                implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
-                implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
+                // Use same logic as main dependencies
+                def nexusUser = project.findProperty("nexusUser") ?: System.getenv("NEXUS_USER") ?: ""
+                def nexusPassword = project.findProperty("nexusPassword") ?: System.getenv("NEXUS_PASSWORD") ?: ""
+                if (nexusUser && nexusPassword) {
+                    implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
+                    implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
+                } else {
+                    implementation "com.github.iExecBlockchainComputing:iexec-commons-poco:$iexecCommonsPocoVersion"
+                    implementation "com.github.iExecBlockchainComputing:iexec-common:$iexecCommonVersion"
+                }
                 implementation 'org.apache.commons:commons-lang3'
                 implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
                 implementation 'org.springframework.boot:spring-boot-starter-web'
