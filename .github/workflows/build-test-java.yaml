@@ -104,13 +104,17 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Download Gradle plugins (online)
+      - name: Download Gradle plugins and public dependencies (online)
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
         run: |
-          echo "📥 Downloading Gradle plugins (requires online access)..."
-          # Download plugins first (this requires online access to Gradle Plugin Portal)
-          ./gradlew tasks --all > /dev/null 2>&1 || true
-          echo "✅ Plugins downloaded"
+          echo "📥 Downloading Gradle plugins and public dependencies (requires online access)..."
+          # Trigger dependency resolution - this will download Lombok, Spring Boot, etc. from Maven Central
+          # Nexus dependencies will fail (403), but Gradle caches dependencies as it resolves them
+          # Nexus dependencies are already in cache from the extracted archive
+          echo "Resolving dependencies (will fail on Nexus, but public deps will be cached)..."
+          # Run a task that requires dependency resolution - allow it to fail on Nexus deps
+          ./gradlew compileJava 2>&1 | grep -E "(Downloaded|Resolved|FAILED|BUILD)" | head -20 || true
+          echo "✅ Public dependencies should be cached now"
 
       - name: Build
         working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
