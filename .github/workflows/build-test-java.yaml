@@ -1,0 +1,70 @@
+name: Build and Test Java Project
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: "Java version to use"
+        default: "17"
+        type: string
+      working-directory:
+        description: "The directory to run jobs from"
+        default: "."
+        type: string
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version != '' && inputs.java-version || '17' }}
+          distribution: "temurin"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
+        run: ./gradlew build -x test
+
+      - name: Run tests
+        working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
+        run: ./gradlew test
+
+      - name: Generate coverage report
+        working-directory: ${{ inputs.working-directory != '' && inputs.working-directory || '.' }}
+        run: ./gradlew jacocoTestReport
+
+      - name: Publish Test Results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: "**/build/test-results/test/*.xml,**/build/test-results/**/*.xml"
+          reporter: "java-junit"
+          fail-on-error: false
+          list-suites: "all"
+          list-tests: "all"
+
+      - name: Upload Test Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: "**/build/reports/jacoco/**"
+          retention-days: 2
