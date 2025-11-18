@@ -76,14 +76,16 @@ jobs:
             for ARCHIVE in /tmp/gradle-deps-*.tar.gz; do
               if [ -f "$ARCHIVE" ]; then
                 echo "Extracting: $(basename $ARCHIVE)"
-                # Debug: show archive contents
-                echo "Archive contents:"
-                tar -tzf "$ARCHIVE" | head -10
                 # Archives contain modules-2 structure, extract to caches root
                 tar -xzf "$ARCHIVE" -C ~/.gradle/caches
                 echo "Extracted to: ~/.gradle/caches"
               fi
             done
+
+            # Force Gradle to rebuild cache index by touching cache lock files
+            # This ensures Gradle recognizes the manually extracted files
+            echo "Rebuilding Gradle cache index..."
+            find ~/.gradle/caches/modules-2 -name "*.lock" -delete 2>/dev/null || true
 
             # Verify cache structure
             echo "Verifying cache structure..."
@@ -128,7 +130,53 @@ jobs:
         run: |
           if [ "${{ steps.nexus-cache.outputs.nexus_cache_available }}" == "true" ]; then
             echo "📥 Downloading Gradle plugins and public dependencies (requires online access)..."
-            echo "🔧 Temporarily modifying build.gradle to use cache..."
+            echo "🔧 Copying cached dependencies to mavenLocal for Gradle to find them..."
+            # Copy cached dependencies to mavenLocal (~/.m2/repository)
+            # Gradle checks mavenLocal before remote repositories
+            # mavenLocal structure: ~/.m2/repository/com/iexec/commons/iexec-commons-poco/5.3.1/iexec-commons-poco-5.3.1.jar
+
+            # Copy iexec-commons-poco
+            for VERSION_DIR in ~/.gradle/caches/modules-2/files-2.1/com.iexec.commons/iexec-commons-poco/*/; do
+              if [ -d "$VERSION_DIR" ]; then
+                VERSION=$(basename "$VERSION_DIR")
+                mkdir -p ~/.m2/repository/com/iexec/commons/iexec-commons-poco/$VERSION
+                # Find JAR file (not sources/javadoc) and copy with correct name
+                JAR_FILE=$(find "$VERSION_DIR" -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -1)
+                if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
+                  cp "$JAR_FILE" ~/.m2/repository/com/iexec/commons/iexec-commons-poco/$VERSION/iexec-commons-poco-$VERSION.jar
+                fi
+                # Find POM file and copy
+                POM_FILE=$(find "$VERSION_DIR" -name "*.pom" | head -1)
+                if [ -n "$POM_FILE" ] && [ -f "$POM_FILE" ]; then
+                  cp "$POM_FILE" ~/.m2/repository/com/iexec/commons/iexec-commons-poco/$VERSION/iexec-commons-poco-$VERSION.pom
+                fi
+              fi
+            done
+
+            # Copy iexec-common
+            for VERSION_DIR in ~/.gradle/caches/modules-2/files-2.1/com.iexec.common/iexec-common/*/; do
+              if [ -d "$VERSION_DIR" ]; then
+                VERSION=$(basename "$VERSION_DIR")
+                mkdir -p ~/.m2/repository/com/iexec/common/iexec-common/$VERSION
+                # Find JAR file and copy with correct name
+                JAR_FILE=$(find "$VERSION_DIR" -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -1)
+                if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
+                  cp "$JAR_FILE" ~/.m2/repository/com/iexec/common/iexec-common/$VERSION/iexec-common-$VERSION.jar
+                fi
+                # Find POM file and copy
+                POM_FILE=$(find "$VERSION_DIR" -name "*.pom" | head -1)
+                if [ -n "$POM_FILE" ] && [ -f "$POM_FILE" ]; then
+                  cp "$POM_FILE" ~/.m2/repository/com/iexec/common/iexec-common/$VERSION/iexec-common-$VERSION.pom
+                fi
+              fi
+            done
+
+            echo "✅ Copied dependencies to mavenLocal"
+            echo "Verifying mavenLocal structure:"
+            ls -la ~/.m2/repository/com/iexec/commons/iexec-commons-poco/*/ 2>/dev/null | head -10 || echo "No files found"
+            ls -la ~/.m2/repository/com/iexec/common/iexec-common/*/ 2>/dev/null | head -10 || echo "No files found"
+
+            echo "🔧 Temporarily disabling Nexus repository..."
             # Backup build.gradle
             cp build.gradle build.gradle.bak
             # Comment out Nexus repository block (lines 33-45)
@@ -136,14 +184,10 @@ jobs:
             # Fix double commenting
             sed -i 's|^// // |// |g' build.gradle
 
-            echo "Resolving dependencies (Nexus deps from cache, public deps from Maven Central)..."
-            # Force Gradle to rebuild cache index by resolving dependencies
-            # Without Nexus repo, Gradle will check cache and find manually extracted files
-            echo "Rebuilding cache index (Gradle will discover cached Nexus deps)..."
-            ./gradlew dependencies --configuration compileClasspath --refresh-dependencies 2>&1 | tail -50 || true
-
-            echo "Verifying Nexus dependencies are resolved from cache..."
-            ./gradlew dependencies --configuration compileClasspath 2>&1 | grep -E "(com.iexec|FAILED|Resolved)" | head -20 || true
+            echo "Resolving dependencies (Nexus deps from mavenLocal cache, public deps from Maven Central)..."
+            # Gradle will check mavenLocal first (where we copied the deps), then Maven Central
+            echo "Resolving dependencies..."
+            ./gradlew dependencies --configuration compileClasspath 2>&1 | grep -E "(com.iexec|FAILED|Resolved|BUILD|Downloaded)" | head -30 || true
 
             echo "Downloading Lombok and other public dependencies..."
             ./gradlew generateEffectiveLombokConfig 2>&1 | tail -30 || true
