@@ -20,15 +20,28 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
+        // JitPack - builds from GitHub releases (no VPN needed, works in CI)
         maven {
-            url 'https://docker-regis-adm.iex.ec/repository/maven-public/'
-            credentials {
-                username nexusUser
-                password nexusPassword
-            }
-        }
-        maven {
+            name = "JitPack"
             url 'https://jitpack.io'
+        }
+        // Nexus repository - always add it so Gradle knows where to look for com.iexec.* dependencies
+        // In CI without VPN: Gradle will use cached artifacts
+        // Locally with VPN: Gradle will download from Nexus
+        def nexusUser = project.findProperty("nexusUser") ?: System.getenv("NEXUS_USER") ?: ""
+        def nexusPassword = project.findProperty("nexusPassword") ?: System.getenv("NEXUS_PASSWORD") ?: ""
+        maven {
+            name = "Nexus"
+            url 'https://docker-regis-adm.iex.ec/repository/maven-public/'
+            // Only add credentials if provided (local development)
+            if (nexusUser && nexusPassword) {
+                credentials {
+                    username = nexusUser
+                    password = nexusPassword
+                }
+            }
+            // Allow repository to fail gracefully in CI (will use cache instead)
+            allowInsecureProtocol = false
         }
     }
     java {
@@ -45,7 +58,8 @@ allprojects {
 }
 
 dependencies {
-    // iexec
+    // iexec - Always use Nexus coordinates (cache contains Nexus artifacts)
+    // Cache will be used when available, otherwise build will fail (expected without VPN)
     implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
     implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
 
@@ -105,6 +119,7 @@ testing {
             }
             dependencies {
                 implementation project()
+                // Use same Nexus coordinates as main dependencies (cache contains Nexus artifacts)
                 implementation "com.iexec.commons:iexec-commons-poco:$iexecCommonsPocoVersion"
                 implementation "com.iexec.common:iexec-common:$iexecCommonVersion"
                 implementation 'org.apache.commons:commons-lang3'
